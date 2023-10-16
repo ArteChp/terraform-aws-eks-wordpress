@@ -24,7 +24,12 @@ variable "wp_db_user" {
 }
 
 variable "wp_db_pass" {
-  description = "Password of the WordPress database."
+  description = "Password for user of the WordPress database."
+  type        = string
+}
+
+variable "wp_db_root_pass" {
+  description = "Password for root user of the WordPress database."
   type        = string
 }
 
@@ -39,12 +44,6 @@ variable "wp_storage_size" {
   default     = "5Gi"
 }
 
-variable "swag_storage_size" {
-  description = "Size of the WordPress storage."
-  type        = string
-  default     = "500M"
-}
-
 variable "wp_debug" {
   description = "Name of the WordPress container image."
   type        = string
@@ -56,8 +55,4 @@ variable "domain" {
   type        = string
 }
 
-variable "lb_ip" {
-  description = "IP address of the load balancer."
-  type        = string
-}
 

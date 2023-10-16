@@ -1,11 +1,46 @@
+locals {
+  # Your AWS EKS Cluster ID goes here.
+  k8s_cluster_name = "EKSCluster"
+}
+
 # Create an EKS cluster
+provider "kubernetes" {
+  alias                  = "eks"
+  host                   = aws_eks_cluster.eks_cluster.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.eks_cluster.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.eks_cluster_auth.token
+}
+
+
+provider "helm" {
+  alias = "eks"
+  kubernetes {
+    host                   = aws_eks_cluster.eks_cluster.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.eks_cluster.certificate_authority[0].data)
+    token                  = data.aws_eks_cluster_auth.eks_cluster_auth.token
+  }
+}
+
 resource "aws_eks_cluster" "eks_cluster" {
-  name     = "EKSCluster"
+  name     = local.k8s_cluster_name
   role_arn = aws_iam_role.eks_cluster.arn
 
   vpc_config {
     subnet_ids = [aws_subnet.wp_subnet_1.id, aws_subnet.wp_subnet_2.id]
   }
+}
+
+data "aws_eks_cluster" "target" {
+  name = local.k8s_cluster_name
+
+  depends_on = [aws_eks_cluster.eks_cluster]
+}
+
+# Create a Kubernetes configuration file
+data "aws_eks_cluster_auth" "eks_cluster_auth" {
+  name = aws_eks_cluster.eks_cluster.name
+
+  depends_on = [aws_eks_cluster.eks_cluster]
 }
 
 # Create an IAM role for EKS cluster
@@ -46,14 +81,20 @@ resource "aws_iam_policy_attachment" "ecr_readonly_policy_attachment" {
 
 resource "aws_iam_policy_attachment" "ssm_policy_attachment" {
   name       = "AmazonSSMManagedInstanceCoreAttachment"
-  roles      = [aws_iam_role.eks_cluster.name]  
+  roles      = [aws_iam_role.eks_cluster.name]
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_policy_attachment" "eks_cni_policy_attachment" {
   name       = "AmazonEKSCNIPolicyAttachment"
-  roles      = [aws_iam_role.eks_cluster.name]  
+  roles      = [aws_iam_role.eks_cluster.name]
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_policy_attachment" "eks_s3_policy_attachment" {
+  name       = "AmazonEKSS3PolicyAttachment"
+  roles      = [aws_iam_role.eks_cluster.name]
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
 #resource "aws_iam_policy_attachment" "eks_efs_csi_policy_attachment" {
@@ -69,8 +110,8 @@ resource "aws_iam_policy" "eks_worker_node_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "autoscaling:DescribeAutoScalingGroups",
           "autoscaling:DescribeAutoScalingInstances",
           "autoscaling:DescribeLaunchConfigurations",
@@ -97,19 +138,8 @@ resource "aws_iam_role_policy_attachment" "worker_node_policy_attachment" {
 }
 
 
-# Create a Kubernetes configuration file
-data "aws_eks_cluster_auth" "eks_cluster_auth" {
-  name = aws_eks_cluster.eks_cluster.name
-
-  depends_on = [aws_eks_cluster.eks_cluster]
-}
 
 # Define a Kubernetes provider using the generated configuration file
-provider "kubernetes" {
-  host                   = aws_eks_cluster.eks_cluster.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.eks_cluster.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.eks_cluster_auth.token
-}
 
 # Create a Kubernetes namespace
 #resource "kubernetes_namespace" "namespace" {
@@ -126,6 +156,15 @@ provider "kubernetes" {
 #}
 
 
+data "tls_certificate" "eks_cert" {
+  url = aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks_openid" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_cert.certificates[0].sha1_fingerprint]
+  url             = data.tls_certificate.eks_cert.url
+}
 
 
 resource "aws_eks_node_group" "wp_node_group" {
@@ -133,10 +172,11 @@ resource "aws_eks_node_group" "wp_node_group" {
   node_group_name = "wpNodeGroup"
   node_role_arn   = aws_iam_role.eks_cluster.arn
   subnet_ids      = [aws_subnet.wp_subnet_1.id]
+  instance_types  = ["t3.medium"]
 
   scaling_config {
     desired_size = 1
-    max_size     = 3
+    max_size     = 1
     min_size     = 1
   }
 
