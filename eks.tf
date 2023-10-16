@@ -138,24 +138,6 @@ resource "aws_iam_role_policy_attachment" "worker_node_policy_attachment" {
 }
 
 
-
-# Define a Kubernetes provider using the generated configuration file
-
-# Create a Kubernetes namespace
-#resource "kubernetes_namespace" "namespace" {
-#  metadata {
-#    name = "wordpress"
-#  }
-#}
-
-#resource "aws_launch_template" "worker_nodes" {
-#  name = "WorkerNodes"
-#  #  image_id = "ami-09f67f6dc966a7829"
-#  instance_type = "t3.small"
-#  vpc_security_group_ids = [aws_security_group.eks_security_group.id]
-#}
-
-
 data "tls_certificate" "eks_cert" {
   url = aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer
 }
@@ -184,13 +166,6 @@ resource "aws_eks_node_group" "wp_node_group" {
     max_unavailable = 1
   }
 
-  #  launch_template {
-  #    id      = aws_launch_template.worker_nodes.id
-  #    version = "$Latest"
-  #  }
-
-  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
-  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [
     aws_iam_role_policy_attachment.worker_node_policy_attachment,
     aws_iam_policy_attachment.eks_cluster_policies,
@@ -199,35 +174,4 @@ resource "aws_eks_node_group" "wp_node_group" {
   ]
 }
 
-#module "fully-loaded-eks-cluster_aws-efs-csi-driver" {
-#  source  = "bootlabstech/fully-loaded-eks-cluster/aws//modules/kubernetes-addons/aws-efs-csi-driver"
-#  version = "1.0.7"
-#  # insert the 1 required variable here
-#}
-
-#resource "helm_release" "cluster-autoscaler" {
-#  name      = "ClusterAutoscaler"
-#
-#  repository = "https://kubernetes.github.io/autoscaler"
-#  chart      = "cluster-autoscaler"
-#
-#  set {
-#    name  = "autoDiscovery.clusterName"
-#    value = aws_eks_cluster.eks_cluster.name
-#  }
-#  set {
-#    name  = "awsRegion"
-#    value = data.aws_region.current.name 
-#  }
-#  debug = true
-#  wait  = true
-#  set {
-#    name  = "awsAccessKeyID"
-#    value = "AKIAS7MPH75HAIEKH34W" 
-#  }
-#  set {
-#    name  = "awsSecretAccessKey"
-#    value = "jcLUckCiRvygBCHGVcieadS+6yu535r6zGUXfB+d" 
-#  }
-#}
 

@@ -43,27 +43,3 @@ resource "kubernetes_manifest" "cert_manager_ci_selfsigned_issuer" {
   }
 }
 
-# resource "kubernetes_manifest" "cert_manager_crt_domain1_com" {
-#   manifest = {
-#     "apiVersion" = "cert-manager.io/v1"
-#     "kind"       = "Certificate"
-#     "metadata" = {
-#       "name" = "domain1.com"
-#       "namespace" = "default"
-#     }
-#     "spec" = {
-#       "commonName" = "domain1.com"
-#       "isCA"       = true
-#       "issuerRef" = {
-#         "group" = "cert-manager.io"
-#         "kind"  = "ClusterIssuer"
-#         "name"  = "selfsigned"
-#       }
-#       "privateKey" = {
-#         "algorithm" = "ECDSA"
-#         "size"      = 256
-#       }
-#       "secretName" = "domain1-secret"
-#     }
-#   }
-# }
